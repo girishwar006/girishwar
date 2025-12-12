@@ -1,0 +1,1565 @@
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+import java.util.Random;
+
+public class TamilMovieBookingSystem extends JFrame {
+    // Components
+    private JTabbedPane mainTabbedPane;
+    private JPanel userPanel, moviesPanel, showtimesPanel, seatsPanel, paymentPanel, confirmationPanel;
+
+    // User Info Components
+    private JTextField userNameField, userEmailField, userPhoneField;
+
+    // Movie Selection Components
+    private JComboBox<String> genreFilterCombo;
+    private JTextField searchField;
+    private JPanel moviesGridPanel;
+    private JButton btnContinueToShowtimes;
+    private JPanel suggestionsPanel;
+
+    // Showtime Components
+    private JPanel showtimesPanelInner;
+    private JButton btnContinueToSeats;
+    private JLabel selectedMovieLabel;
+
+    // Seat Selection Components
+    private JPanel seatsGridPanel;
+    private JButton btnContinueToPayment;
+    private JLabel selectedShowtimeLabel;
+    private JLabel selectedSeatsLabel;
+    private JLabel totalPriceLabel;
+
+    // Payment Components
+    private ButtonGroup paymentGroup;
+    private JRadioButton cardRadio, upiRadio, walletRadio;
+    private JButton btnProcessPayment;
+    private JProgressBar paymentProgressBar;
+    private JLabel paymentSummaryLabel;
+
+    // Confirmation Components
+    private JLabel confirmationDetailsLabel;
+    private JPanel qrCodePanel;
+    private JPanel recommendationsPanel;
+
+    // Movie Data
+    private List<Movie> movies = new ArrayList<>();
+    private List<Movie> suggestedMovies = new ArrayList<>();
+    private List<Showtime> showtimes = new ArrayList<>();
+
+    // Booking State
+    private User currentUser;
+    private Movie selectedMovie;
+    private Showtime selectedShowtime;
+    private List<String> selectedSeats = new ArrayList<>();
+    private String selectedPaymentMethod;
+    private Booking currentBooking;
+
+    // Seat Data
+    private boolean[][][] seatData; // [showtimeIndex][row][col]
+
+    // Random for demo data
+    private Random random = new Random();
+
+    public TamilMovieBookingSystem() {
+        initializeData();
+        setupUI();
+    }
+
+    private void initializeData() {
+        // Initialize movies
+        movies.add(new Movie("M1", "Vikram", "Action Thriller", 175, 350,
+                "https://m.media-amazon.com/images/M/MV5BOTc4OGMxMGYtNjgyOC00YjVkLWIzMDgtZTJjZGE0MDc5M2FhXkEyXkFqcGdeQXVyMTEzNzg0Mjkx.V1.jpg",
+                "https://www.youtube.com/embed/OKBMCL-frPU", 8.4, true));
+
+        movies.add(new Movie("M2", "Jailer", "Action", 168, 350,
+                "https://m.media-amazon.com/images/M/MV5BZWI4YzA0ZWYtYjA5Ny00MDQ0LTliYTEtNGM1ZWNlNzU2Y2VjXkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1_FMjpg_UX1000.jpg",
+                "https://www.youtube.com/embed/RR7K-_O0k78", 7.1, true));
+
+        movies.add(new Movie("M3", "Leo", "Action", 164, 350,
+                "https://m.media-amazon.com/images/M/MV5BYzNjM2Y2Y2MtN2U1Yi00MjZjLTllMDMtMGE1NDc3YzU4ZGUyXkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1.jpg",
+                "https://www.youtube.com/embed/Po3jStA673E", 7.2, false));
+
+        movies.add(new Movie("M4", "Don", "Action", 146, 300,
+                "https://m.media-amazon.com/images/M/MV5BOWYxYjY3MDAtY2NkYi00ODJmLWE0MDYtMTE0ODljZDNlMjU1XkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1.jpg",
+                "https://www.youtube.com/embed/8765g7eoxpM", 6.8, false));
+
+        movies.add(new Movie("M5", "Thunivu", "Heist Action", 146, 300,
+                "https://m.media-amazon.com/images/M/MV5BNzQyY2FkMjktY2U0OC00Y2VlLThlMDItYTM5Y2M1NzI0NTU0XkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1_FMjpg_UX1000.jpg",
+                "https://www.youtube.com/embed/6yKDu5_ANc8", 6.5, false));
+
+        movies.add(new Movie("M6", "Ponniyin Selvan", "Historical", 167, 400,
+                "https://m.media-amazon.com/images/M/MV5BYjFkZjkzY2MtM2UwMy00YjVmLWJkYjUtMGIwNjZiY2U5ODI0XkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1_FMjpg_UX1000.jpg",
+                "https://www.youtube.com/embed/vbXT5l4qcw8", 7.6, true));
+
+        movies.add(new Movie("M7", "Master", "Action Thriller", 179, 300,
+                "https://m.media-amazon.com/images/M/MV5BYzBjYjViY2QtYjM5Yy00N2M3LWJkMWQtMDQ4NDA4NWU5ZTU2XkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1.jpg",
+                "https://www.youtube.com/embed/UTiXQcrLlv4", 7.8, false));
+
+        movies.add(new Movie("M8", "Kaithi 2", "Action Thriller", 147, 350,
+                "https://m.media-amazon.com/images/M/MV5BZjE1MWM4YzQtZjU4OC00YzE5LWI5Y2ItYjI1YzQ3M2Y0N2Y0XkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1.jpg",
+                "https://www.youtube.com/embed/gO6Qr6YVKqQ", 8.2, true));
+
+        // Initialize suggested movies
+        suggestedMovies.add(new Movie("S1", "Indian 2", "Action Thriller", 0, 0,
+                "https://m.media-amazon.com/images/M/MV5BODUyN2Y0YTQtYjRlZi00NDVjLWI5YjYtM2VjZjFmZjk3M2Y3XkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1.jpg",
+                "https://www.youtube.com/embed/in6S9p73eOE", 0, false));
+
+        suggestedMovies.add(new Movie("S2", "Captain Miller", "Period Action", 0, 0,
+                "https://m.media-amazon.com/images/M/MV5BNjRkY2YyZjgtZGU0OC00Y2U4LWI4YzQtYjQ0ZjhkYjE4ZjU4XkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1.jpg",
+                "https://www.youtube.com/embed/iyB7C2L4-3s", 0, false));
+
+        suggestedMovies.add(new Movie("S3", "GOAT", "Sports Drama", 0, 0,
+                "https://m.media-amazon.com/images/M/MV5BZmY0YzE1YjctYzUxOS00ZGM5LTg0NWQtNWU5Y2UxM2E2OTIxXkEyXkFqcGdeQXVyMTUzNTgzNzM0.V1.jpg",
+                "https://www.youtube.com/embed/6yKDu5_ANc8", 0, false));
+
+        // Initialize showtimes
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DAY_OF_MONTH, 1);
+
+        for (int i = 0; i < movies.size(); i++) {
+            Movie movie = movies.get(i);
+            for (int j = 0; j < 2; j++) {
+                cal.set(Calendar.HOUR_OF_DAY, 18 + (j * 3));
+                cal.set(Calendar.MINUTE, 30);
+
+                showtimes.add(new Showtime(
+                        "S" + (i * 2 + j + 1),
+                        movie.getId(),
+                        cal.getTime(),
+                        6,
+                        8));
+            }
+            cal.add(Calendar.DAY_OF_MONTH, 1);
+        }
+
+        // Initialize seat data
+        initializeSeatData();
+    }
+
+    private void initializeSeatData() {
+        seatData = new boolean[showtimes.size()][6][8];
+
+        for (int s = 0; s < showtimes.size(); s++) {
+            for (int r = 0; r < 6; r++) {
+                for (int c = 0; c < 8; c++) {
+                    // Randomly book 20% of seats
+                    seatData[s][r][c] = random.nextDouble() < 0.2;
+                }
+            }
+        }
+    }
+
+    private void setupUI() {
+        setTitle("Tamil Movie Booking System");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
+
+        // Header Panel
+        JPanel headerPanel = createHeaderPanel();
+        add(headerPanel, BorderLayout.NORTH);
+
+        // Main Tabbed Pane
+        mainTabbedPane = new JTabbedPane(JTabbedPane.TOP);
+        mainTabbedPane.setBackground(new Color(102, 126, 234));
+        mainTabbedPane.setForeground(Color.WHITE);
+        mainTabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 14));
+
+        // Create all panels
+        userPanel = createUserPanel();
+        moviesPanel = createMoviesPanel();
+        showtimesPanel = createShowtimesPanel();
+        seatsPanel = createSeatsPanel();
+        paymentPanel = createPaymentPanel();
+        confirmationPanel = createConfirmationPanel();
+
+        // Add panels to tabbed pane
+        mainTabbedPane.addTab("👤 User Info", userPanel);
+        mainTabbedPane.addTab("🎭 Movies", moviesPanel);
+        mainTabbedPane.addTab("🕐 Showtimes", showtimesPanel);
+        mainTabbedPane.addTab("💺 Seats", seatsPanel);
+        mainTabbedPane.addTab("💳 Payment", paymentPanel);
+        mainTabbedPane.addTab("✅ Confirmation", confirmationPanel);
+
+        // Disable all tabs except first one
+        for (int i = 1; i < mainTabbedPane.getTabCount(); i++) {
+            mainTabbedPane.setEnabledAt(i, false);
+        }
+
+        add(mainTabbedPane, BorderLayout.CENTER);
+
+        // Set initial size
+        setSize(1200, 800);
+        setLocationRelativeTo(null);
+    }
+
+    private JPanel createHeaderPanel() {
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BorderLayout());
+        headerPanel.setBackground(new Color(102, 126, 234));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("🎬 Tamil Movie Booking System", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        titleLabel.setForeground(Color.WHITE);
+
+        JLabel subtitleLabel = new JLabel("Book your favorite Tamil movies with ease", SwingConstants.CENTER);
+        subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        subtitleLabel.setForeground(new Color(240, 240, 240));
+
+        headerPanel.add(titleLabel, BorderLayout.NORTH);
+        headerPanel.add(subtitleLabel, BorderLayout.CENTER);
+
+        return headerPanel;
+    }
+
+    private JPanel createUserPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        // Title
+        JLabel titleLabel = new JLabel("👤 User Information");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(85, 85, 85));
+        titleLabel.setBorder(BorderFactory.createMatteBorder(0, 0, 3, 0, new Color(102, 126, 234)));
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // Form panel
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        formPanel.setBackground(Color.WHITE);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        // Name field
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        formPanel.add(new JLabel("Full Name:"), gbc);
+        gbc.gridx = 1;
+        gbc.gridwidth = 2;
+        userNameField = new JTextField(30);
+        userNameField.setPreferredSize(new Dimension(300, 35));
+        userNameField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        formPanel.add(userNameField, gbc);
+
+        // Email field
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        formPanel.add(new JLabel("Email Address:"), gbc);
+        gbc.gridx = 1;
+        gbc.gridwidth = 2;
+        userEmailField = new JTextField(30);
+        userEmailField.setPreferredSize(new Dimension(300, 35));
+        userEmailField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        formPanel.add(userEmailField, gbc);
+
+        // Phone field
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 1;
+        formPanel.add(new JLabel("Phone Number:"), gbc);
+        gbc.gridx = 1;
+        gbc.gridwidth = 2;
+        userPhoneField = new JTextField(30);
+        userPhoneField.setPreferredSize(new Dimension(300, 35));
+        userPhoneField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        formPanel.add(userPhoneField, gbc);
+
+        // Continue button
+        gbc.gridx = 1;
+        gbc.gridy = 3;
+        gbc.gridwidth = 1;
+        gbc.anchor = GridBagConstraints.CENTER;
+        JButton continueButton = new JButton("Continue to Movies");
+        continueButton.setBackground(new Color(102, 126, 234));
+        continueButton.setForeground(Color.WHITE);
+        continueButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        continueButton.setFocusPainted(false);
+        continueButton.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        continueButton.addActionListener(e -> validateUserInfo());
+        formPanel.add(continueButton, gbc);
+
+        // Add components to main panel
+        panel.add(titleLabel);
+        panel.add(Box.createRigidArea(new Dimension(0, 20)));
+        panel.add(formPanel);
+
+        return panel;
+    }
+
+    private JPanel createMoviesPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Title
+        JLabel titleLabel = new JLabel("🎭 Select a Movie");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(85, 85, 85));
+        titleLabel.setBorder(BorderFactory.createMatteBorder(0, 0, 3, 0, new Color(102, 126, 234)));
+
+        // Search and filter panel
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.setBackground(Color.WHITE);
+
+        searchField = new JTextField(20);
+        searchField.setPreferredSize(new Dimension(250, 35));
+        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        searchField.putClientProperty("JTextField.placeholderText", "Search for movies...");
+        searchField.addKeyListener(new KeyAdapter() {
+            public void keyReleased(KeyEvent e) {
+                filterMovies();
+            }
+        });
+
+        String[] genres = { "All", "Action", "Thriller", "Historical", "Heist" };
+        genreFilterCombo = new JComboBox<>(genres);
+        genreFilterCombo.setPreferredSize(new Dimension(150, 35));
+        genreFilterCombo.addActionListener(e -> filterMovies());
+
+        searchPanel.add(new JLabel("Search:"));
+        searchPanel.add(Box.createRigidArea(new Dimension(10, 0)));
+        searchPanel.add(searchField);
+        searchPanel.add(Box.createRigidArea(new Dimension(20, 0)));
+        searchPanel.add(new JLabel("Filter by:"));
+        searchPanel.add(Box.createRigidArea(new Dimension(10, 0)));
+        searchPanel.add(genreFilterCombo);
+
+        // Movies grid panel
+        moviesGridPanel = new JPanel();
+        moviesGridPanel.setLayout(new GridLayout(0, 4, 15, 15));
+        moviesGridPanel.setBackground(Color.WHITE);
+        moviesGridPanel.setBorder(BorderFactory.createEmptyBorder(20, 10, 10, 10));
+
+        JScrollPane moviesScrollPane = new JScrollPane(moviesGridPanel);
+        moviesScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        moviesScrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
+        // "You Might Also Like" panel
+        JPanel suggestionsTitlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        suggestionsTitlePanel.setBackground(Color.WHITE);
+        JLabel suggestionsLabel = new JLabel("🎯 You Might Also Like");
+        suggestionsLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        suggestionsTitlePanel.add(suggestionsLabel);
+
+        suggestionsPanel = new JPanel();
+        suggestionsPanel.setLayout(new GridLayout(1, 3, 15, 15));
+        suggestionsPanel.setBackground(Color.WHITE);
+        suggestionsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 20, 10));
+
+        JScrollPane suggestionsScrollPane = new JScrollPane(suggestionsPanel);
+        suggestionsScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        suggestionsScrollPane.setPreferredSize(new Dimension(0, 200));
+
+        // Bottom button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBackground(Color.WHITE);
+
+        btnContinueToShowtimes = new JButton("Continue to Showtimes →");
+        btnContinueToShowtimes.setBackground(new Color(102, 126, 234));
+        btnContinueToShowtimes.setForeground(Color.WHITE);
+        btnContinueToShowtimes.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btnContinueToShowtimes.setFocusPainted(false);
+        btnContinueToShowtimes.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        btnContinueToShowtimes.setEnabled(false);
+        btnContinueToShowtimes.addActionListener(e -> showNextTab());
+
+        buttonPanel.add(btnContinueToShowtimes);
+
+        // Add components to main panel
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.setBackground(Color.WHITE);
+        northPanel.add(titleLabel, BorderLayout.NORTH);
+        northPanel.add(searchPanel, BorderLayout.CENTER);
+
+        panel.add(northPanel, BorderLayout.NORTH);
+        panel.add(moviesScrollPane, BorderLayout.CENTER);
+
+        JPanel southPanel = new JPanel(new BorderLayout());
+        southPanel.setBackground(Color.WHITE);
+        southPanel.add(suggestionsTitlePanel, BorderLayout.NORTH);
+        southPanel.add(suggestionsScrollPane, BorderLayout.CENTER);
+        southPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        panel.add(southPanel, BorderLayout.SOUTH);
+
+        // Render movies
+        renderMovies();
+        renderSuggestions();
+
+        return panel;
+    }
+
+    private JPanel createShowtimesPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Title
+        JLabel titleLabel = new JLabel("🕐 Select Showtime");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(85, 85, 85));
+        titleLabel.setBorder(BorderFactory.createMatteBorder(0, 0, 3, 0, new Color(102, 126, 234)));
+
+        // Selected movie info
+        selectedMovieLabel = new JLabel();
+        selectedMovieLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        selectedMovieLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Showtimes panel
+        showtimesPanelInner = new JPanel();
+        showtimesPanelInner.setLayout(new GridLayout(0, 2, 15, 15));
+        showtimesPanelInner.setBackground(Color.WHITE);
+
+        JScrollPane showtimesScrollPane = new JScrollPane(showtimesPanelInner);
+        showtimesScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        showtimesScrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
+        // Bottom button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBackground(Color.WHITE);
+
+        btnContinueToSeats = new JButton("Continue to Seats →");
+        btnContinueToSeats.setBackground(new Color(102, 126, 234));
+        btnContinueToSeats.setForeground(Color.WHITE);
+        btnContinueToSeats.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btnContinueToSeats.setFocusPainted(false);
+        btnContinueToSeats.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        btnContinueToSeats.setEnabled(false);
+        btnContinueToSeats.addActionListener(e -> showNextTab());
+
+        buttonPanel.add(btnContinueToSeats);
+
+        // Add components to main panel
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.setBackground(Color.WHITE);
+        northPanel.add(titleLabel, BorderLayout.NORTH);
+        northPanel.add(selectedMovieLabel, BorderLayout.CENTER);
+
+        panel.add(northPanel, BorderLayout.NORTH);
+        panel.add(showtimesScrollPane, BorderLayout.CENTER);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private JPanel createSeatsPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Title
+        JLabel titleLabel = new JLabel("💺 Select Seats");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(85, 85, 85));
+        titleLabel.setBorder(BorderFactory.createMatteBorder(0, 0, 3, 0, new Color(102, 126, 234)));
+
+        // Selected showtime info
+        selectedShowtimeLabel = new JLabel();
+        selectedShowtimeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        // Seats grid panel
+        seatsGridPanel = new JPanel();
+        seatsGridPanel.setBackground(Color.WHITE);
+
+        // Screen label
+        JLabel screenLabel = new JLabel("🎬 SCREEN THIS WAY 🎬", SwingConstants.CENTER);
+        screenLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        screenLabel.setForeground(Color.WHITE);
+        screenLabel.setBackground(Color.DARK_GRAY);
+        screenLabel.setOpaque(true);
+        screenLabel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+
+        // Seat legend
+        JPanel legendPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        legendPanel.setBackground(Color.WHITE);
+
+        JPanel availablePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        availablePanel.setBackground(Color.WHITE);
+        JLabel availableLabel = new JLabel("Available");
+        JPanel availableColor = new JPanel();
+        availableColor.setBackground(new Color(76, 175, 80));
+        availableColor.setPreferredSize(new Dimension(20, 20));
+        availableColor.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+        availablePanel.add(availableColor);
+        availablePanel.add(availableLabel);
+
+        JPanel bookedPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        bookedPanel.setBackground(Color.WHITE);
+        JLabel bookedLabel = new JLabel("Booked");
+        JPanel bookedColor = new JPanel();
+        bookedColor.setBackground(new Color(244, 67, 54));
+        bookedColor.setPreferredSize(new Dimension(20, 20));
+        bookedColor.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+        bookedPanel.add(bookedColor);
+        bookedPanel.add(bookedLabel);
+
+        JPanel selectedPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        selectedPanel.setBackground(Color.WHITE);
+        JLabel selectedLabel = new JLabel("Selected");
+        JPanel selectedColor = new JPanel();
+        selectedColor.setBackground(new Color(255, 193, 7));
+        selectedColor.setPreferredSize(new Dimension(20, 20));
+        selectedColor.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+        selectedPanel.add(selectedColor);
+        selectedPanel.add(selectedLabel);
+
+        legendPanel.add(availablePanel);
+        legendPanel.add(Box.createRigidArea(new Dimension(20, 0)));
+        legendPanel.add(bookedPanel);
+        legendPanel.add(Box.createRigidArea(new Dimension(20, 0)));
+        legendPanel.add(selectedPanel);
+
+        // Selected seats and total price
+        JPanel infoPanel = new JPanel(new GridLayout(2, 1));
+        infoPanel.setBackground(Color.WHITE);
+
+        selectedSeatsLabel = new JLabel("Selected Seats: None");
+        selectedSeatsLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        totalPriceLabel = new JLabel("Total Price: ₹0");
+        totalPriceLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        totalPriceLabel.setForeground(new Color(102, 126, 234));
+
+        infoPanel.add(selectedSeatsLabel);
+        infoPanel.add(totalPriceLabel);
+
+        // Bottom button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBackground(Color.WHITE);
+
+        btnContinueToPayment = new JButton("Continue to Payment →");
+        btnContinueToPayment.setBackground(new Color(102, 126, 234));
+        btnContinueToPayment.setForeground(Color.WHITE);
+        btnContinueToPayment.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btnContinueToPayment.setFocusPainted(false);
+        btnContinueToPayment.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        btnContinueToPayment.setEnabled(false);
+        btnContinueToPayment.addActionListener(e -> showNextTab());
+
+        buttonPanel.add(btnContinueToPayment);
+
+        // Center panel for seats
+        JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.setBackground(Color.WHITE);
+        centerPanel.add(screenLabel, BorderLayout.NORTH);
+
+        JPanel seatsContainer = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        seatsContainer.setBackground(Color.WHITE);
+        seatsContainer.add(seatsGridPanel);
+        centerPanel.add(seatsContainer, BorderLayout.CENTER);
+        centerPanel.add(legendPanel, BorderLayout.SOUTH);
+
+        // Add components to main panel
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.setBackground(Color.WHITE);
+        northPanel.add(titleLabel, BorderLayout.NORTH);
+        northPanel.add(selectedShowtimeLabel, BorderLayout.CENTER);
+
+        panel.add(northPanel, BorderLayout.NORTH);
+        panel.add(centerPanel, BorderLayout.CENTER);
+
+        JPanel southPanel = new JPanel(new BorderLayout());
+        southPanel.setBackground(Color.WHITE);
+        southPanel.add(infoPanel, BorderLayout.CENTER);
+        southPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        panel.add(southPanel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private JPanel createPaymentPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Title
+        JLabel titleLabel = new JLabel("💳 Payment");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(85, 85, 85));
+        titleLabel.setBorder(BorderFactory.createMatteBorder(0, 0, 3, 0, new Color(102, 126, 234)));
+
+        // Booking summary
+        paymentSummaryLabel = new JLabel();
+        paymentSummaryLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        paymentSummaryLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 20, 10));
+
+        // Payment methods
+        JPanel paymentMethodsPanel = new JPanel(new GridLayout(1, 3, 15, 15));
+        paymentMethodsPanel.setBackground(Color.WHITE);
+        paymentMethodsPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 20, 10));
+
+        paymentGroup = new ButtonGroup();
+
+        JPanel cardPanel = createPaymentMethodPanel("💳 Card", "Credit/Debit Card");
+        cardPanel.setName("card");
+        JPanel upiPanel = createPaymentMethodPanel("📱 UPI", "UPI Payment");
+        upiPanel.setName("upi");
+        JPanel walletPanel = createPaymentMethodPanel("👛 Wallet", "Digital Wallet");
+        walletPanel.setName("wallet");
+
+        paymentMethodsPanel.add(cardPanel);
+        paymentMethodsPanel.add(upiPanel);
+        paymentMethodsPanel.add(walletPanel);
+
+        // Payment processing
+        paymentProgressBar = new JProgressBar();
+        paymentProgressBar.setVisible(false);
+        paymentProgressBar.setIndeterminate(true);
+        paymentProgressBar.setString("Processing payment...");
+        paymentProgressBar.setStringPainted(true);
+
+        // Bottom button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBackground(Color.WHITE);
+
+        btnProcessPayment = new JButton("Complete Booking");
+        btnProcessPayment.setBackground(new Color(102, 126, 234));
+        btnProcessPayment.setForeground(Color.WHITE);
+        btnProcessPayment.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btnProcessPayment.setFocusPainted(false);
+        btnProcessPayment.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        btnProcessPayment.setEnabled(false);
+        btnProcessPayment.addActionListener(e -> processPayment());
+
+        buttonPanel.add(btnProcessPayment);
+
+        // Add components to main panel
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.setBackground(Color.WHITE);
+        northPanel.add(titleLabel, BorderLayout.NORTH);
+        northPanel.add(paymentSummaryLabel, BorderLayout.CENTER);
+
+        panel.add(northPanel, BorderLayout.NORTH);
+
+        JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.setBackground(Color.WHITE);
+        centerPanel.add(paymentMethodsPanel, BorderLayout.CENTER);
+        centerPanel.add(paymentProgressBar, BorderLayout.SOUTH);
+
+        panel.add(centerPanel, BorderLayout.CENTER);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private JPanel createPaymentMethodPanel(String title, String description) {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY, 2));
+        panel.setPreferredSize(new Dimension(150, 100));
+
+        JRadioButton radioButton = new JRadioButton(title);
+        radioButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        radioButton.setBackground(Color.WHITE);
+        radioButton.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JLabel descLabel = new JLabel(description, SwingConstants.CENTER);
+        descLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
+        panel.add(radioButton, BorderLayout.NORTH);
+        panel.add(descLabel, BorderLayout.CENTER);
+
+        panel.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                radioButton.setSelected(true);
+                selectedPaymentMethod = panel.getName();
+                btnProcessPayment.setEnabled(true);
+                highlightPaymentMethod(panel);
+            }
+        });
+
+        paymentGroup.add(radioButton);
+
+        return panel;
+    }
+
+    private JPanel createConfirmationPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Title
+        JLabel titleLabel = new JLabel("✅ Booking Confirmed!");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(85, 85, 85));
+        titleLabel.setBorder(BorderFactory.createMatteBorder(0, 0, 3, 0, new Color(102, 126, 234)));
+
+        // Confirmation details
+        confirmationDetailsLabel = new JLabel();
+        confirmationDetailsLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        confirmationDetailsLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 20, 10));
+
+        // QR Code panel
+        qrCodePanel = new JPanel();
+        qrCodePanel.setBackground(Color.WHITE);
+        qrCodePanel.setBorder(BorderFactory.createTitledBorder("Your Digital Ticket"));
+
+        // Recommendations panel
+        recommendationsPanel = new JPanel();
+        recommendationsPanel.setLayout(new GridLayout(1, 4, 15, 15));
+        recommendationsPanel.setBackground(Color.WHITE);
+        recommendationsPanel.setBorder(BorderFactory.createTitledBorder("You Might Also Like"));
+
+        // New booking button
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBackground(Color.WHITE);
+
+        JButton newBookingButton = new JButton("Book Another Movie");
+        newBookingButton.setBackground(new Color(102, 126, 234));
+        newBookingButton.setForeground(Color.WHITE);
+        newBookingButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        newBookingButton.setFocusPainted(false);
+        newBookingButton.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        newBookingButton.addActionListener(e -> startNewBooking());
+
+        buttonPanel.add(newBookingButton);
+
+        // Add components to main panel
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.setBackground(Color.WHITE);
+        northPanel.add(titleLabel, BorderLayout.NORTH);
+        northPanel.add(confirmationDetailsLabel, BorderLayout.CENTER);
+
+        panel.add(northPanel, BorderLayout.NORTH);
+
+        JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.setBackground(Color.WHITE);
+        centerPanel.add(qrCodePanel, BorderLayout.NORTH);
+        centerPanel.add(recommendationsPanel, BorderLayout.SOUTH);
+
+        panel.add(centerPanel, BorderLayout.CENTER);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void renderMovies() {
+        moviesGridPanel.removeAll();
+
+        for (Movie movie : movies) {
+            JPanel movieCard = createMovieCard(movie);
+            moviesGridPanel.add(movieCard);
+        }
+
+        moviesGridPanel.revalidate();
+        moviesGridPanel.repaint();
+    }
+
+    private JPanel createMovieCard(Movie movie) {
+        JPanel card = new JPanel();
+        card.setLayout(new BorderLayout());
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.LIGHT_GRAY),
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+        card.setPreferredSize(new Dimension(250, 350));
+
+        // Poster panel
+        JPanel posterPanel = new JPanel();
+        posterPanel.setLayout(new BorderLayout());
+        posterPanel.setBackground(Color.LIGHT_GRAY);
+        posterPanel.setPreferredSize(new Dimension(230, 200));
+
+        JLabel posterLabel = new JLabel(movie.getName(), SwingConstants.CENTER);
+        posterLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        posterLabel.setForeground(Color.WHITE);
+        posterLabel.setBackground(new Color(102, 126, 234));
+        posterLabel.setOpaque(true);
+        posterPanel.add(posterLabel, BorderLayout.CENTER);
+
+        // Rating badge
+        if (movie.getRating() > 0) {
+            JLabel ratingLabel = new JLabel("⭐ " + movie.getRating());
+            ratingLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            ratingLabel.setForeground(Color.WHITE);
+            ratingLabel.setBackground(Color.DARK_GRAY);
+            ratingLabel.setOpaque(true);
+            ratingLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+            posterPanel.add(ratingLabel, BorderLayout.SOUTH);
+        }
+
+        // Info panel
+        JPanel infoPanel = new JPanel();
+        infoPanel.setLayout(new GridLayout(4, 1));
+        infoPanel.setBackground(Color.WHITE);
+
+        JLabel nameLabel = new JLabel(movie.getName());
+        nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+
+        JLabel genreLabel = new JLabel(movie.getGenre());
+        genreLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        genreLabel.setForeground(Color.GRAY);
+
+        JLabel durationLabel = new JLabel(movie.getDuration() + " mins");
+        durationLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
+        JLabel priceLabel = new JLabel("₹" + movie.getPrice());
+        priceLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        priceLabel.setForeground(new Color(102, 126, 234));
+
+        infoPanel.add(nameLabel);
+        infoPanel.add(genreLabel);
+        infoPanel.add(durationLabel);
+        infoPanel.add(priceLabel);
+
+        // Add to card
+        card.add(posterPanel, BorderLayout.CENTER);
+        card.add(infoPanel, BorderLayout.SOUTH);
+
+        // Add click listener
+        card.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                selectMovie(movie);
+            }
+        });
+
+        return card;
+    }
+
+    private void renderSuggestions() {
+        suggestionsPanel.removeAll();
+
+        for (Movie movie : suggestedMovies) {
+            JPanel suggestionCard = createSuggestionCard(movie);
+            suggestionsPanel.add(suggestionCard);
+        }
+
+        suggestionsPanel.revalidate();
+        suggestionsPanel.repaint();
+    }
+
+    private JPanel createSuggestionCard(Movie movie) {
+        JPanel card = new JPanel();
+        card.setLayout(new BorderLayout());
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+        card.setPreferredSize(new Dimension(200, 180));
+
+        // Poster panel
+        JPanel posterPanel = new JPanel();
+        posterPanel.setBackground(Color.LIGHT_GRAY);
+        posterPanel.setPreferredSize(new Dimension(200, 120));
+
+        JLabel posterLabel = new JLabel(movie.getName(), SwingConstants.CENTER);
+        posterLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        posterLabel.setForeground(Color.WHITE);
+        posterLabel.setBackground(new Color(102, 126, 234));
+        posterLabel.setOpaque(true);
+        posterPanel.add(posterLabel);
+
+        // Info panel
+        JPanel infoPanel = new JPanel();
+        infoPanel.setLayout(new GridLayout(2, 1));
+        infoPanel.setBackground(Color.WHITE);
+
+        JLabel nameLabel = new JLabel(movie.getName(), SwingConstants.CENTER);
+        nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+
+        JLabel genreLabel = new JLabel(movie.getGenre(), SwingConstants.CENTER);
+        genreLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        genreLabel.setForeground(Color.GRAY);
+
+        infoPanel.add(nameLabel);
+        infoPanel.add(genreLabel);
+
+        // Add to card
+        card.add(posterPanel, BorderLayout.CENTER);
+        card.add(infoPanel, BorderLayout.SOUTH);
+
+        // Add click listener
+        card.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                selectMovieFromSuggestion(movie);
+            }
+        });
+
+        return card;
+    }
+
+    private void filterMovies() {
+        String searchTerm = searchField.getText().toLowerCase();
+        String selectedGenre = (String) genreFilterCombo.getSelectedItem();
+
+        for (Component comp : moviesGridPanel.getComponents()) {
+            if (comp instanceof JPanel) {
+                JPanel card = (JPanel) comp;
+                Component[] children = card.getComponents();
+                if (children.length > 1 && children[1] instanceof JPanel) {
+                    JPanel infoPanel = (JPanel) children[1];
+                    Component[] infoChildren = infoPanel.getComponents();
+                    if (infoChildren.length > 0 && infoChildren[0] instanceof JLabel) {
+                        JLabel nameLabel = (JLabel) infoChildren[0];
+                        String movieName = nameLabel.getText().toLowerCase();
+
+                        // Check if matches search term and genre
+                        boolean matchesSearch = searchTerm.isEmpty() || movieName.contains(searchTerm);
+                        boolean matchesGenre = selectedGenre.equals("All") ||
+                                nameLabel.getText().contains(selectedGenre);
+
+                        card.setVisible(matchesSearch && matchesGenre);
+                    }
+                }
+            }
+        }
+    }
+
+    private void validateUserInfo() {
+        String name = userNameField.getText().trim();
+        String email = userEmailField.getText().trim();
+        String phone = userPhoneField.getText().trim();
+
+        if (name.isEmpty() || email.isEmpty() || phone.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please fill in all user information fields.",
+                    "Validation Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid email address.",
+                    "Validation Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (!phone.matches("\\d{10}")) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid 10-digit phone number.",
+                    "Validation Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        currentUser = new User(name, email, phone);
+
+        // Enable next tab
+        mainTabbedPane.setEnabledAt(1, true);
+        mainTabbedPane.setSelectedIndex(1);
+
+        JOptionPane.showMessageDialog(this, "User information saved successfully!",
+                "Success", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void selectMovie(Movie movie) {
+        selectedMovie = movie;
+        btnContinueToShowtimes.setEnabled(true);
+
+        // Update selected movie info
+        selectedMovieLabel.setText("<html><b>Selected Movie:</b> " + movie.getName() +
+                "<br><b>Genre:</b> " + movie.getGenre() +
+                "<br><b>Duration:</b> " + movie.getDuration() + " mins" +
+                "<br><b>Price per seat:</b> ₹" + movie.getPrice() + "</html>");
+
+        // Render showtimes for this movie
+        renderShowtimes();
+    }
+
+    private void selectMovieFromSuggestion(Movie movie) {
+        // Find the movie in the main list
+        for (Movie m : movies) {
+            if (m.getName().equals(movie.getName())) {
+                selectMovie(m);
+                mainTabbedPane.setSelectedIndex(1);
+                break;
+            }
+        }
+    }
+
+    private void renderShowtimes() {
+        showtimesPanelInner.removeAll();
+
+        if (selectedMovie == null)
+            return;
+
+        List<Showtime> filteredShowtimes = new ArrayList<>();
+        for (Showtime showtime : showtimes) {
+            if (showtime.getMovieId().equals(selectedMovie.getId())) {
+                filteredShowtimes.add(showtime);
+            }
+        }
+
+        for (Showtime showtime : filteredShowtimes) {
+            JPanel showtimeCard = createShowtimeCard(showtime);
+            showtimesPanelInner.add(showtimeCard);
+        }
+
+        showtimesPanelInner.revalidate();
+        showtimesPanelInner.repaint();
+    }
+
+    private JPanel createShowtimeCard(Showtime showtime) {
+        JPanel card = new JPanel();
+        card.setLayout(new BorderLayout());
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.LIGHT_GRAY, 2),
+                BorderFactory.createEmptyBorder(15, 15, 15, 15)));
+        card.setPreferredSize(new Dimension(300, 100));
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMMM d, yyyy");
+        SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm a");
+
+        JLabel dateLabel = new JLabel(dateFormat.format(showtime.getTime()));
+        dateLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+
+        JLabel timeLabel = new JLabel(timeFormat.format(showtime.getTime()));
+        timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        timeLabel.setForeground(new Color(102, 126, 234));
+
+        JLabel seatsLabel = new JLabel(showtime.getRows() * showtime.getCols() + " seats available");
+        seatsLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        seatsLabel.setForeground(Color.GRAY);
+
+        JPanel infoPanel = new JPanel();
+        infoPanel.setLayout(new GridLayout(3, 1));
+        infoPanel.setBackground(Color.WHITE);
+        infoPanel.add(dateLabel);
+        infoPanel.add(timeLabel);
+        infoPanel.add(seatsLabel);
+
+        card.add(infoPanel, BorderLayout.CENTER);
+
+        // Add click listener
+        card.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                selectShowtime(showtime);
+                highlightShowtimeCard(card);
+            }
+        });
+
+        return card;
+    }
+
+    private void selectShowtime(Showtime showtime) {
+        selectedShowtime = showtime;
+        btnContinueToSeats.setEnabled(true);
+
+        SimpleDateFormat format = new SimpleDateFormat("EEEE, MMMM d, yyyy 'at' hh:mm a");
+        selectedShowtimeLabel.setText("<html><b>Selected Showtime:</b> " +
+                format.format(showtime.getTime()) + "</html>");
+
+        // Render seats
+        renderSeats();
+    }
+
+    private void renderSeats() {
+        seatsGridPanel.removeAll();
+
+        if (selectedShowtime == null)
+            return;
+
+        // Find showtime index
+        int showtimeIndex = -1;
+        for (int i = 0; i < showtimes.size(); i++) {
+            if (showtimes.get(i).getId().equals(selectedShowtime.getId())) {
+                showtimeIndex = i;
+                break;
+            }
+        }
+
+        if (showtimeIndex == -1)
+            return;
+
+        seatsGridPanel.setLayout(new GridLayout(6, 8, 5, 5));
+
+        for (int row = 0; row < 6; row++) {
+            for (int col = 0; col < 8; col++) {
+                String seatId = "R" + (row + 1) + "C" + (col + 1);
+                JButton seatButton = new JButton(seatId);
+                seatButton.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+                seatButton.setFocusPainted(false);
+
+                if (seatData[showtimeIndex][row][col]) {
+                    seatButton.setBackground(new Color(244, 67, 54)); // Booked
+                    seatButton.setEnabled(false);
+                } else {
+                    seatButton.setBackground(new Color(76, 175, 80)); // Available
+                    seatButton.addActionListener(e -> toggleSeatSelection(seatButton, seatId));
+                }
+
+                seatButton.setOpaque(true);
+                seatButton.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+
+                seatsGridPanel.add(seatButton);
+            }
+        }
+
+        seatsGridPanel.revalidate();
+        seatsGridPanel.repaint();
+    }
+
+    private void toggleSeatSelection(JButton seatButton, String seatId) {
+        if (seatButton.getBackground().equals(new Color(255, 193, 7))) {
+            // Deselect seat
+            seatButton.setBackground(new Color(76, 175, 80));
+            selectedSeats.remove(seatId);
+        } else {
+            // Select seat
+            seatButton.setBackground(new Color(255, 193, 7));
+            selectedSeats.add(seatId);
+        }
+
+        // Update UI
+        selectedSeatsLabel.setText("Selected Seats: " +
+                (selectedSeats.isEmpty() ? "None" : String.join(", ", selectedSeats)));
+
+        int totalPrice = selectedSeats.size() * selectedMovie.getPrice();
+        totalPriceLabel.setText("Total Price: ₹" + totalPrice);
+
+        btnContinueToPayment.setEnabled(!selectedSeats.isEmpty());
+
+        // Update payment summary
+        updatePaymentSummary();
+    }
+
+    private void updatePaymentSummary() {
+        if (selectedMovie == null || selectedShowtime == null)
+            return;
+
+        int totalPrice = selectedSeats.size() * selectedMovie.getPrice();
+        SimpleDateFormat format = new SimpleDateFormat("EEEE, MMMM d, yyyy 'at' hh:mm a");
+
+        String summary = "<html><b>Booking Summary:</b><br>" +
+                "Movie: " + selectedMovie.getName() + "<br>" +
+                "Showtime: " + format.format(selectedShowtime.getTime()) + "<br>" +
+                "Selected Seats: " + (selectedSeats.isEmpty() ? "None" : String.join(", ", selectedSeats)) + "<br>" +
+                "Number of Seats: " + selectedSeats.size() + "<br>" +
+                "<b>Total Amount: ₹" + totalPrice + "</b></html>";
+
+        paymentSummaryLabel.setText(summary);
+    }
+
+    private void processPayment() {
+        if (selectedPaymentMethod == null) {
+            JOptionPane.showMessageDialog(this, "Please select a payment method.",
+                    "Payment Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Show progress bar
+        paymentProgressBar.setVisible(true);
+        btnProcessPayment.setEnabled(false);
+
+        // Simulate payment processing
+        Timer timer = new Timer(3000, e -> {
+            paymentProgressBar.setVisible(false);
+            completeBooking();
+        });
+        timer.setRepeats(false);
+        timer.start();
+    }
+
+    private void completeBooking() {
+        // Update seat data
+        int showtimeIndex = -1;
+        for (int i = 0; i < showtimes.size(); i++) {
+            if (showtimes.get(i).getId().equals(selectedShowtime.getId())) {
+                showtimeIndex = i;
+                break;
+            }
+        }
+
+        if (showtimeIndex != -1) {
+            for (String seat : selectedSeats) {
+                int row = Integer.parseInt(seat.substring(1, 2)) - 1;
+                int col = Integer.parseInt(seat.substring(3, 4)) - 1;
+                seatData[showtimeIndex][row][col] = true;
+            }
+        }
+
+        // Create booking
+        currentBooking = new Booking(
+                "BK" + System.currentTimeMillis(),
+                currentUser,
+                selectedMovie,
+                selectedShowtime,
+                new ArrayList<>(selectedSeats),
+                selectedPaymentMethod);
+
+        // Show confirmation
+        showConfirmation();
+
+        // Enable confirmation tab
+        mainTabbedPane.setEnabledAt(5, true);
+        mainTabbedPane.setSelectedIndex(5);
+    }
+
+    private void showConfirmation() {
+        if (currentBooking == null)
+            return;
+
+        SimpleDateFormat format = new SimpleDateFormat("EEEE, MMMM d, yyyy 'at' hh:mm a");
+        String details = "<html><b>Booking Details:</b><br>" +
+                "Booking ID: " + currentBooking.getId() + "<br>" +
+                "Customer: " + currentBooking.getUser().getName() + "<br>" +
+                "Email: " + currentBooking.getUser().getEmail() + "<br>" +
+                "Phone: " + currentBooking.getUser().getPhone() + "<br>" +
+                "Movie: " + currentBooking.getMovie().getName() + "<br>" +
+                "Showtime: " + format.format(currentBooking.getShowtime().getTime()) + "<br>" +
+                "Seats: " + String.join(", ", currentBooking.getSeats()) + "<br>" +
+                "Total Amount: ₹" + (currentBooking.getSeats().size() * currentBooking.getMovie().getPrice()) + "<br>" +
+                "Payment Method: " + currentBooking.getPaymentMethod().toUpperCase() + "<br>" +
+                "<br><font color='green'>📧 Email and SMS notifications have been sent!</font><br>" +
+                "Thank you for your booking. Your tickets have been confirmed.</html>";
+
+        confirmationDetailsLabel.setText(details);
+
+        // Generate QR code
+        generateQRCode();
+
+        // Show recommendations
+        showRecommendations();
+    }
+
+    private void generateQRCode() {
+        qrCodePanel.removeAll();
+        qrCodePanel.setLayout(new FlowLayout(FlowLayout.CENTER));
+
+        JPanel qrPanel = new JPanel();
+        qrPanel.setLayout(new GridLayout(5, 1));
+        qrPanel.setBackground(Color.WHITE);
+        qrPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+
+        qrPanel.add(new JLabel("████████████████"));
+        qrPanel.add(new JLabel("██          ██"));
+        qrPanel.add(new JLabel("██  " + currentBooking.getId() + "  ██"));
+        qrPanel.add(new JLabel("██          ██"));
+        qrPanel.add(new JLabel("████████████████"));
+
+        JLabel scanLabel = new JLabel("Scan at theater entrance", SwingConstants.CENTER);
+
+        JPanel container = new JPanel();
+        container.setLayout(new BorderLayout());
+        container.setBackground(Color.WHITE);
+        container.add(qrPanel, BorderLayout.CENTER);
+        container.add(scanLabel, BorderLayout.SOUTH);
+
+        qrCodePanel.add(container);
+        qrCodePanel.revalidate();
+        qrCodePanel.repaint();
+    }
+
+    private void showRecommendations() {
+        recommendationsPanel.removeAll();
+
+        // Get recommendations based on selected movie's genre
+        String currentGenre = selectedMovie.getGenre().split(" ")[0];
+        List<Movie> recommendations = new ArrayList<>();
+
+        for (Movie movie : movies) {
+            if (!movie.getId().equals(selectedMovie.getId()) &&
+                    movie.getGenre().contains(currentGenre)) {
+                recommendations.add(movie);
+                if (recommendations.size() >= 4)
+                    break;
+            }
+        }
+
+        // If not enough recommendations, add trending movies
+        if (recommendations.size() < 4) {
+            for (Movie movie : movies) {
+                if (!movie.getId().equals(selectedMovie.getId()) &&
+                        !recommendations.contains(movie) &&
+                        movie.isTrending()) {
+                    recommendations.add(movie);
+                    if (recommendations.size() >= 4)
+                        break;
+                }
+            }
+        }
+
+        for (Movie movie : recommendations) {
+            JPanel recCard = createRecommendationCard(movie);
+            recommendationsPanel.add(recCard);
+        }
+
+        recommendationsPanel.revalidate();
+        recommendationsPanel.repaint();
+    }
+
+    private JPanel createRecommendationCard(Movie movie) {
+        JPanel card = new JPanel();
+        card.setLayout(new BorderLayout());
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+
+        JLabel posterLabel = new JLabel(movie.getName(), SwingConstants.CENTER);
+        posterLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        posterLabel.setForeground(Color.WHITE);
+        posterLabel.setBackground(new Color(102, 126, 234));
+        posterLabel.setOpaque(true);
+        posterLabel.setPreferredSize(new Dimension(150, 100));
+
+        card.add(posterLabel, BorderLayout.CENTER);
+
+        // Add click listener
+        card.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                startNewBooking();
+                // Select this movie in the movies tab
+                SwingUtilities.invokeLater(() -> {
+                    mainTabbedPane.setSelectedIndex(1);
+                    selectMovie(movie);
+                });
+            }
+        });
+
+        return card;
+    }
+
+    private void startNewBooking() {
+        // Reset state
+        selectedMovie = null;
+        selectedShowtime = null;
+        selectedSeats.clear();
+        selectedPaymentMethod = null;
+        currentBooking = null;
+
+        // Reset UI
+        btnContinueToShowtimes.setEnabled(false);
+        btnContinueToSeats.setEnabled(false);
+        btnContinueToPayment.setEnabled(false);
+        btnProcessPayment.setEnabled(false);
+
+        selectedMovieLabel.setText("");
+        selectedShowtimeLabel.setText("");
+        selectedSeatsLabel.setText("Selected Seats: None");
+        totalPriceLabel.setText("Total Price: ₹0");
+        paymentSummaryLabel.setText("");
+        confirmationDetailsLabel.setText("");
+
+        // Clear selections
+        paymentGroup.clearSelection();
+        qrCodePanel.removeAll();
+        recommendationsPanel.removeAll();
+
+        // Go back to movies tab
+        mainTabbedPane.setSelectedIndex(1);
+    }
+
+    private void showNextTab() {
+        int currentIndex = mainTabbedPane.getSelectedIndex();
+        if (currentIndex < mainTabbedPane.getTabCount() - 1) {
+            mainTabbedPane.setEnabledAt(currentIndex + 1, true);
+            mainTabbedPane.setSelectedIndex(currentIndex + 1);
+        }
+    }
+
+    private void highlightPaymentMethod(JPanel selectedPanel) {
+        // Reset all borders
+        for (Component comp : ((JPanel) paymentPanel.getComponent(1)).getComponent(0).getComponents()) {
+            if (comp instanceof JPanel) {
+                comp.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY, 2));
+            }
+        }
+
+        // Highlight selected
+        selectedPanel.setBorder(BorderFactory.createLineBorder(new Color(102, 126, 234), 3));
+    }
+
+    private void highlightShowtimeCard(JPanel selectedCard) {
+        // Reset all borders
+        for (Component comp : showtimesPanelInner.getComponents()) {
+            if (comp instanceof JPanel) {
+                comp.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(Color.LIGHT_GRAY, 2),
+                        BorderFactory.createEmptyBorder(15, 15, 15, 15)));
+            }
+        }
+
+        // Highlight selected
+        selectedCard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(102, 126, 234), 3),
+                BorderFactory.createEmptyBorder(15, 15, 15, 15)));
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            TamilMovieBookingSystem app = new TamilMovieBookingSystem();
+            app.setVisible(true);
+        });
+    }
+
+    // Data Model Classes
+    class Movie {
+        private String id;
+        private String name;
+        private String genre;
+        private int duration;
+        private int price;
+        private String posterUrl;
+        private String trailerUrl;
+        private double rating;
+        private boolean trending;
+
+        public Movie(String id, String name, String genre, int duration, int price,
+                String posterUrl, String trailerUrl, double rating, boolean trending) {
+            this.id = id;
+            this.name = name;
+            this.genre = genre;
+            this.duration = duration;
+            this.price = price;
+            this.posterUrl = posterUrl;
+            this.trailerUrl = trailerUrl;
+            this.rating = rating;
+            this.trending = trending;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getGenre() {
+            return genre;
+        }
+
+        public int getDuration() {
+            return duration;
+        }
+
+        public int getPrice() {
+            return price;
+        }
+
+        public String getPosterUrl() {
+            return posterUrl;
+        }
+
+        public String getTrailerUrl() {
+            return trailerUrl;
+        }
+
+        public double getRating() {
+            return rating;
+        }
+
+        public boolean isTrending() {
+            return trending;
+        }
+    }
+
+    class Showtime {
+        private String id;
+        private String movieId;
+        private Date time;
+        private int rows;
+        private int cols;
+
+        public Showtime(String id, String movieId, Date time, int rows, int cols) {
+            this.id = id;
+            this.movieId = movieId;
+            this.time = time;
+            this.rows = rows;
+            this.cols = cols;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public String getMovieId() {
+            return movieId;
+        }
+
+        public Date getTime() {
+            return time;
+        }
+
+        public int getRows() {
+            return rows;
+        }
+
+        public int getCols() {
+            return cols;
+        }
+    }
+
+    class User {
+        private String name;
+        private String email;
+        private String phone;
+
+        public User(String name, String email, String phone) {
+            this.name = name;
+            this.email = email;
+            this.phone = phone;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public String getPhone() {
+            return phone;
+        }
+    }
+
+    class Booking {
+        private String id;
+        private User user;
+        private Movie movie;
+        private Showtime showtime;
+        private List<String> seats;
+        private String paymentMethod;
+
+        public Booking(String id, User user, Movie movie, Showtime showtime,
+                List<String> seats, String paymentMethod) {
+            this.id = id;
+            this.user = user;
+            this.movie = movie;
+            this.showtime = showtime;
+            this.seats = seats;
+            this.paymentMethod = paymentMethod;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public User getUser() {
+            return user;
+        }
+
+        public Movie getMovie() {
+            return movie;
+        }
+
+        public Showtime getShowtime() {
+            return showtime;
+        }
+
+        public List<String> getSeats() {
+            return seats;
+        }
+
+        public String getPaymentMethod() {
+            return paymentMethod;
+        }
+    }
+}
