@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Heart Disease - ML Data Preprocessing</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px #aaa;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        h2 {
+            margin-top: 30px;
+            color: #444;
+        }
+
+        .upload-box {
+            text-align: center;
+            padding: 25px;
+            border: 2px dashed #777;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        th {
+            background: #333;
+            color: white;
+            padding: 8px;
+        }
+
+        td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+
+        tr:nth-child(even) {
+            background: #f2f2f2;
+        }
+
+        .result {
+            background: #eef7ff;
+            border-left: 5px solid #007bff;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        #output {
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Heart Disease Prediction</h1>
+    <h2 style="text-align:center;">
+        Machine Learning Data Preprocessing
+    </h2>
+
+    <div class="upload-box">
+
+        <h3>Upload Heart Disease Dataset</h3>
+
+        <input type="file" id="csvFile" accept=".csv">
+
+        <br><br>
+
+        <button onclick="loadCSV()">
+            Load Dataset
+        </button>
+
+        <button onclick="preprocessData()">
+            Preprocess Data
+        </button>
+
+    </div>
+
+    <div id="message"></div>
+
+    <h2>1. Original Dataset</h2>
+
+    <div id="originalData"></div>
+
+    <h2>2. Dataset Information</h2>
+
+    <div id="datasetInfo"></div>
+
+    <h2>3. Missing Values</h2>
+
+    <div id="missingValues"></div>
+
+    <h2>4. Preprocessing Result</h2>
+
+    <div id="preprocessingResult"></div>
+
+    <h2>5. Preprocessed Dataset</h2>
+
+    <div id="output"></div>
+
+</div>
+
+
+<script>
+
+let data = [];
+let headers = [];
+
+
+/* =========================================
+   LOAD CSV FILE
+========================================= */
+
+function loadCSV() {
+
+    const fileInput = document.getElementById("csvFile");
+
+    if (fileInput.files.length === 0) {
+
+        showMessage(
+            "Please select heart.csv file",
+            "error"
+        );
+
+        return;
+    }
+
+    const file = fileInput.files[0];
+
+    const reader = new FileReader();
+
+    reader.onload = function(event) {
+
+        const text = event.target.result;
+
+        parseCSV(text);
+
+    };
+
+    reader.readAsText(file);
+}
+
+
+/* =========================================
+   PARSE CSV
+========================================= */
+
+function parseCSV(text) {
+
+    const lines = text.trim().split(/\r?\n/);
+
+    if (lines.length < 2) {
+
+        showMessage(
+            "CSV file is empty",
+            "error"
+        );
+
+        return;
+    }
+
+    headers = lines[0]
+        .split(",")
+        .map(x => x.trim());
+
+    data = [];
+
+    for (let i = 1; i < lines.length; i++) {
+
+        const values = lines[i]
+            .split(",")
+            .map(x => x.trim());
+
+        if (values.length !== headers.length) {
+            continue;
+        }
+
+        let row = {};
+
+        for (let j = 0; j < headers.length; j++) {
+
+            row[headers[j]] = values[j];
+
+        }
+
+        data.push(row);
+    }
+
+    showMessage(
+        "Dataset loaded successfully!",
+        "success"
+    );
+
+    displayTable(
+        data,
+        "originalData",
+        10
+    );
+
+    displayDatasetInfo();
+
+    findMissingValues();
+}
+
+
+/* =========================================
+   DISPLAY TABLE
+========================================= */
+
+function displayTable(rows, elementId, limit = 20) {
+
+    const div = document.getElementById(elementId);
+
+    if (rows.length === 0) {
+
+        div.innerHTML = "No data available";
+
+        return;
+    }
+
+    let html = "<table>";
+
+    html += "<tr>";
+
+    headers.forEach(header => {
+
+        html += "<th>" + header + "</th>";
+
+    });
+
+    html += "</tr>";
+
+
+    const displayRows = rows.slice(0, limit);
+
+    displayRows.forEach(row => {
+
+        html += "<tr>";
+
+        headers.forEach(header => {
+
+            html += "<td>" +
+                row[header] +
+                "</td>";
+
+        });
+
+        html += "</tr>";
+
+    });
+
+    html += "</table>";
+
+    html +=
+        "<p>Showing " +
+        displayRows.length +
+        " of " +
+        rows.length +
+        " rows</p>";
+
+    div.innerHTML = html;
+}
+
+
+/* =========================================
+   DATASET INFORMATION
+========================================= */
+
+function displayDatasetInfo() {
+
+    let html = `
+        <div class="result">
+            <b>Total Rows:</b> ${data.length}
+            <br><br>
+            <b>Total Columns:</b> ${headers.length}
+            <br><br>
+            <b>Columns:</b> ${headers.join(", ")}
+        </div>
+    `;
+
+    document.getElementById(
+        "datasetInfo"
+    ).innerHTML = html;
+}
+
+
+/* =========================================
+   FIND MISSING VALUES
+========================================= */
+
+function findMissingValues() {
+
+    let html = "<table>";
+
+    html += `
+        <tr>
+            <th>Column</th>
+            <th>Missing Values</th>
+        </tr>
+    `;
+
+    headers.forEach(header => {
+
+        let count = 0;
+
+        data.forEach(row => {
+
+            if (
+                row[header] === "" ||
+                row[header] === null ||
+                row[header] === "NA" ||
+                row[header] === "?"
+            ) {
+
+                count++;
+
+            }
+
+        });
+
+        html += `
+            <tr>
+                <td>${header}</td>
+                <td>${count}</td>
+            </tr>
+        `;
+
+    });
+
+    html += "</table>";
+
+    document.getElementById(
+        "missingValues"
+    ).innerHTML = html;
+}
+
+
+/* =========================================
+   PREPROCESS DATA
+========================================= */
+
+function preprocessData() {
+
+    if (data.length === 0) {
+
+        showMessage(
+            "Please load the CSV file first",
+            "error"
+        );
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       STEP 1: REMOVE DUPLICATES
+    ----------------------------------------- */
+
+    let uniqueData = [];
+
+    let seen = new Set();
+
+    data.forEach(row => {
+
+        const key = JSON.stringify(row);
+
+        if (!seen.has(key)) {
+
+            seen.add(key);
+
+            uniqueData.push(row);
+
+        }
+
+    });
+
+    const duplicatesRemoved =
+        data.length - uniqueData.length;
+
+
+    /* -----------------------------------------
+       STEP 2: HANDLE MISSING VALUES
+    ----------------------------------------- */
+
+    headers.forEach(header => {
+
+        let numericValues = [];
+
+        uniqueData.forEach(row => {
+
+            let value = row[header];
+
+            if (
+                value !== "" &&
+                value !== "?" &&
+                value !== "NA" &&
+                !isNaN(value)
+            ) {
+
+                numericValues.push(
+                    Number(value)
+                );
+
+            }
+
+        });
+
+
+        if (numericValues.length > 0) {
+
+            /*
+                Calculate mean
+            */
+
+            let sum = numericValues.reduce(
+                (a, b) => a + b,
+                0
+            );
+
+            let mean =
+                sum / numericValues.length;
+
+
+            uniqueData.forEach(row => {
+
+                if (
+                    row[header] === "" ||
+                    row[header] === "?" ||
+                    row[header] === "NA"
+                ) {
+
+                    row[header] =
+                        mean.toFixed(2);
+
+                }
+
+            });
+
+        }
+
+    });
+
+
+    /* -----------------------------------------
+       STEP 3: ENCODE CATEGORICAL DATA
+    ----------------------------------------- */
+
+    let encodingInfo = [];
+
+
+    headers.forEach(header => {
+
+        let values = uniqueData.map(
+            row => row[header]
+        );
+
+        let numeric = values.every(
+            value => !isNaN(value)
+        );
+
+
+        if (!numeric) {
+
+            let uniqueValues =
+                [...new Set(values)];
+
+            let map = {};
+
+            uniqueValues.forEach(
+                (value, index) => {
+
+                    map[value] = index;
+
+                }
+            );
+
+
+            uniqueData.forEach(row => {
+
+                row[header] =
+                    map[row[header]];
+
+            });
+
+
+            encodingInfo.push(
+                header +
+                ": " +
+                JSON.stringify(map)
+            );
+
+        }
+
+    });
+
+
+    /* -----------------------------------------
+       STEP 4: NORMALIZATION
+    ----------------------------------------- */
+
+    let normalizedColumns = [];
+
+
+    headers.forEach(header => {
+
+        let values = uniqueData.map(
+            row => Number(row[header])
+        );
+
+        if (
+            values.every(
+                value => !isNaN(value)
+            )
+        ) {
+
+            let min =
+                Math.min(...values);
+
+            let max =
+                Math.max(...values);
+
+
+            /*
+                Min-Max Normalization
+
+                x' = (x-min)/(max-min)
+            */
+
+            if (max !== min) {
+
+                uniqueData.forEach(row => {
+
+                    let value =
+                        Number(row[header]);
+
+                    row[header] =
+                        (
+                            (value - min) /
+                            (max - min)
+                        ).toFixed(4);
+
+                });
+
+            }
+
+            normalizedColumns.push(header);
+
+        }
+
+    });
+
+
+    /* -----------------------------------------
+       STEP 5: TRAIN TEST SPLIT
+    ----------------------------------------- */
+
+    let shuffled =
+        [...uniqueData];
+
+    shuffleArray(shuffled);
+
+
+    const trainSize =
+        Math.floor(
+            shuffled.length * 0.8
+        );
+
+    const trainData =
+        shuffled.slice(0, trainSize);
+
+    const testData =
+        shuffled.slice(trainSize);
+
+
+    /* -----------------------------------------
+       DISPLAY RESULT
+    ----------------------------------------- */
+
+    let resultHTML = `
+
+        <div class="result">
+
+            <p>
+                <b>Original Rows:</b>
+                ${data.length}
+            </p>
+
+            <p>
+                <b>Duplicate Rows Removed:</b>
+                ${duplicatesRemoved}
+            </p>
+
+            <p>
+                <b>Rows After Cleaning:</b>
+                ${uniqueData.length}
+            </p>
+
+            <p>
+                <b>Columns:</b>
+                ${headers.length}
+            </p>
+
+            <p>
+                <b>Training Data:</b>
+                ${trainData.length}
+                rows
+            </p>
+
+            <p>
+                <b>Testing Data:</b>
+                ${testData.length}
+                rows
+            </p>
+
+            <p>
+                <b>Normalization:</b>
+                Min-Max Scaling
+            </p>
+
+            <p>
+                <b>Normalized Columns:</b>
+                ${normalizedColumns.join(", ")}
+            </p>
+
+            <p>
+                <b>Categorical Encoding:</b>
+                Label Encoding
+            </p>
+
+            <p>
+                <b>Encoding:</b>
+                ${encodingInfo.length > 0
+                    ? encodingInfo.join("<br>")
+                    : "No categorical columns detected"
+                }
+            </p>
+
+        </div>
+
+    `;
+
+
+    document.getElementById(
+        "preprocessingResult"
+    ).innerHTML = resultHTML;
+
+
+    displayTable(
+        uniqueData,
+        "output",
+        20
+    );
+
+}
+
+
+/* =========================================
+   SHUFFLE DATA
+========================================= */
+
+function shuffleArray(array) {
+
+    for (
+        let i = array.length - 1;
+        i > 0;
+        i--
+    ) {
+
+        const j =
+            Math.floor(
+                Math.random() * (i + 1)
+            );
+
+        [
+            array[i],
+            array[j]
+        ] =
+        [
+            array[j],
+            array[i]
+        ];
+
+    }
+
+}
+
+
+/* =========================================
+   MESSAGE
+========================================= */
+
+function showMessage(
+    message,
+    type
+) {
+
+    const div =
+        document.getElementById(
+            "message"
+        );
+
+    div.innerHTML = `
+        <p class="${type}">
+            ${message}
+        </p>
+    `;
+
+}
+
+</script>
+
+</body>
+</html>
