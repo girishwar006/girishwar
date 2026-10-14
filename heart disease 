@@ -1,0 +1,602 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pickle
+
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report,
+    roc_curve,
+    roc_auc_score,
+)
+
+# =========================================================
+# PAGE CONFIGURATION
+# =========================================================
+st.set_page_config(
+    page_title="AI Heart Disease Predictor",
+    page_icon="❤️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# =========================================================
+# CUSTOM CSS
+# =========================================================
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    .main {
+        background:
+            radial-gradient(circle at top left, rgba(255, 120, 120, 0.15), transparent 30%),
+            radial-gradient(circle at bottom right, rgba(85, 142, 250, 0.12), transparent 25%),
+            #f5f7fb;
+    }
+
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+
+    .title {
+        font-size: 2.6rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 0.2rem;
+    }
+
+    .subtitle {
+        color: #4b5563;
+        font-size: 1.05rem;
+        margin-bottom: 1rem;
+    }
+
+    .section-card {
+        background: rgba(255,255,255,0.85);
+        border: 1px solid rgba(17,24,39,0.05);
+        border-radius: 18px;
+        padding: 1rem 1.1rem;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .metric-container {
+        background: linear-gradient(135deg, #ffffff, #f8fafc);
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 0.8rem;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+    }
+
+    .stButton > button {
+        border-radius: 12px;
+        font-weight: 600;
+        background: linear-gradient(90deg, #ef4444, #f97316);
+        color: white;
+        border: none;
+        padding: 0.6rem 1rem;
+    }
+
+    .stDownloadButton > button {
+        border-radius: 12px;
+        font-weight: 600;
+        border: none;
+        background: linear-gradient(90deg, #2563eb, #7c3aed);
+        color: white;
+    }
+
+    div[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #ffffff, #f8fafc);
+    }
+
+    .stTabs [role="tablist"] {
+        gap: 0.5rem;
+    }
+
+    .stTabs [role="tab"] {
+        border-radius: 12px 12px 0 0;
+        padding: 0.7rem 1rem;
+        font-weight: 600;
+    }
+
+    .stTabs [role="tab"][aria-selected="true"] {
+        background: linear-gradient(135deg, #dbeafe, #ede9fe);
+        color: #1e3a8a;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# =========================================================
+# HELPER FUNCTIONS
+# =========================================================
+
+@st.cache_data
+def load_dataset(file):
+    return pd.read_csv(file)
+
+def validate_dataset(df):
+    if df is None:
+        raise ValueError("No dataset provided.")
+    if "target" not in df.columns:
+        raise ValueError("The dataset must contain a 'target' column.")
+    if df.empty:
+        raise ValueError("The uploaded dataset is empty.")
+    if df["target"].isna().any():
+        raise ValueError("The target column contains missing values.")
+    if set(df["target"].unique()) - {0, 1}:
+        raise ValueError("The target column must be binary and encoded as 0 and 1 only.")
+    X = df.drop(columns=["target"]).select_dtypes(include=["number"])
+    if X.empty:
+        raise ValueError("No numeric input features were found. Please provide numeric features only.")
+    if df.shape[0] < 25:
+        raise ValueError("This demo requires at least 25 records for training and evaluation.")
+    if df["target"].value_counts().min() < 5:
+        raise ValueError("At least 5 rows per class are required for this demo.")
+    return X, df["target"]
+
+def build_models(random_state=42):
+    return {
+        "Logistic Regression": Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+            ("model", LogisticRegression(max_iter=2000))
+        ]),
+        "Decision Tree": Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("model", DecisionTreeClassifier(max_depth=5, random_state=random_state))
+        ]),
+        "Random Forest": Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("model", RandomForestClassifier(n_estimators=100, random_state=random_state))
+        ]),
+        "SVM (RBF)": Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+            ("model", SVC(probability=True, random_state=random_state))
+        ]),
+    }
+
+def metrics_cards(acc, prec, rec, f1):
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Accuracy", f"{acc:.3f}")
+    c2.metric("Precision", f"{prec:.3f}")
+    c3.metric("Recall", f"{rec:.3f}")
+    c4.metric("F1-Score", f"{f1:.3f}")
+
+def plot_confusion_matrix(cm):
+    fig, ax = plt.subplots(figsize=(5, 4))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        linewidths=0.5,
+        linecolor="white",
+        cbar=True,
+        xticklabels=["Predicted 0", "Predicted 1"],
+        yticklabels=["Actual 0", "Actual 1"],
+        ax=ax,
+    )
+    ax.set_title("Confusion Matrix", fontsize=14, weight="bold")
+    ax.set_xlabel("Predicted Label")
+    ax.set_ylabel("Actual Label")
+    st.pyplot(fig)
+    plt.close(fig)
+
+def plot_roc_curve(y_true, y_prob):
+    roc_auc = roc_auc_score(y_true, y_prob)
+    fpr, tpr, _ = roc_curve(y_true, y_prob)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(fpr, tpr, color="#2563eb", lw=2, label=f"ROC Curve (AUC = {roc_auc:.3f})")
+    ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Chance")
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC Curve")
+    ax.legend(loc="lower right")
+    st.pyplot(fig)
+    plt.close(fig)
+    st.metric("ROC-AUC", f"{roc_auc:.3f}")
+
+def get_feature_importance(model, feature_names):
+    if model is None:
+        return None
+    if hasattr(model, "named_steps"):
+        estimator = model.named_steps.get("model")
+    else:
+        estimator = model
+
+    if estimator is None:
+        return None
+
+    if hasattr(estimator, "feature_importances_"):
+        importance = pd.Series(estimator.feature_importances_, index=feature_names)
+        return importance.sort_values(ascending=False)
+    return None
+
+# =========================================================
+# INITIALIZE SESSION STATE
+# =========================================================
+if "comparison_results" not in st.session_state:
+    st.session_state["comparison_results"] = None
+
+if "fitted_models" not in st.session_state:
+    st.session_state["fitted_models"] = {}
+
+if "best_model" not in st.session_state:
+    st.session_state["best_model"] = None
+
+if "best_params" not in st.session_state:
+    st.session_state["best_params"] = None
+
+# =========================================================
+# APP HEADER
+# =========================================================
+st.markdown('<div class="title">❤️ AI-Based Heart Disease Prediction</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Machine learning, model comparison, tuning, evaluation, and patient-inspired prediction.</div>', unsafe_allow_html=True)
+st.warning("Educational use only. This tool is not a medical diagnostic system.")
+
+# =========================================================
+# SIDEBAR
+# =========================================================
+with st.sidebar:
+    st.header("Dataset & Settings")
+    uploaded_file = st.file_uploader("Upload heart.csv", type=["csv"])
+
+    if uploaded_file is not None:
+        try:
+            df = load_dataset(uploaded_file)
+            X, y = validate_dataset(df)
+            st.success("Dataset loaded and validated.")
+        except Exception as e:
+            st.error(f"Dataset error: {e}")
+            st.stop()
+
+    test_size = st.slider("Test set size (%)", min_value=10, max_value=40, value=20, step=5)
+    random_state = st.number_input("Random seed", min_value=0, max_value=999, value=42, step=1)
+    cv_folds = st.slider("Cross-validation folds", min_value=3, max_value=10, value=5, step=1)
+
+    st.markdown("---")
+    st.caption("Feature columns should be numeric and the target should be binary (0/1).")
+
+# =========================================================
+# IF NO FILE
+# =========================================================
+if "df" not in locals():
+    st.info("Please upload a CSV dataset from the sidebar to begin.")
+    st.stop()
+
+# =========================================================
+# SPLIT DATA
+# =========================================================
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=test_size / 100,
+    random_state=int(random_state),
+    stratify=y
+)
+
+# =========================================================
+# TABS
+# =========================================================
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Overview",
+    "Compare Models",
+    "Tune Model",
+    "Evaluation",
+    "Patient Prediction"
+])
+
+# =========================================================
+# TAB 1: OVERVIEW
+# =========================================================
+with tab1:
+    st.header("1. Dataset Overview")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Records", len(df))
+    col2.metric("Numeric Features", X.shape[1])
+    col3.metric("Target Classes", y.nunique())
+
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    with st.expander("View dataset preview"):
+        st.dataframe(df.head(20), use_container_width=True)
+    with st.expander("View dataset statistics"):
+        st.dataframe(X.describe().round(3), use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.subheader("Train/Test Split Summary")
+    st.write(f"Training records: {len(X_train)}")
+    st.write(f"Testing records: {len(X_test)}")
+    st.write("Train class distribution:")
+    st.dataframe(y_train.value_counts().rename("count").to_frame(), use_container_width=True)
+    st.write("Test class distribution:")
+    st.dataframe(y_test.value_counts().rename("count").to_frame(), use_container_width=True)
+
+# =========================================================
+# TAB 2: MODEL COMPARISON
+# =========================================================
+with tab2:
+    st.header("2. Model Comparison")
+
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.write("Compare commonly used classification models and review their test-set metrics.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if st.button("Run Model Comparison", use_container_width=True):
+        models = build_models(random_state=int(random_state))
+
+        results = []
+        fitted = {}
+
+        progress = st.progress(0)
+        total_steps = len(models)
+
+        for idx, (name, model) in enumerate(models.items()):
+            model.fit(X_train, y_train)
+            preds = model.predict(X_test)
+
+            results.append({
+                "Model": name,
+                "Accuracy": accuracy_score(y_test, preds),
+                "Precision": precision_score(y_test, preds, zero_division=0),
+                "Recall": recall_score(y_test, preds, zero_division=0),
+                "F1-Score": f1_score(y_test, preds, zero_division=0),
+            })
+
+            fitted[name] = model
+            progress.progress((idx + 1) / total_steps)
+
+        results_df = pd.DataFrame(results).set_index("Model")
+        st.session_state["comparison_results"] = results_df
+        st.session_state["fitted_models"] = fitted
+
+        st.success("Model comparison completed successfully.")
+
+    if st.session_state["comparison_results"] is not None:
+        st.subheader("Comparative Performance Table")
+        st.dataframe(st.session_state["comparison_results"].round(3), use_container_width=True)
+
+        st.subheader("Bar Chart Comparison")
+        st.bar_chart(st.session_state["comparison_results"])
+
+    else:
+        st.info("Click the button above to compare machine learning models.")
+
+# =========================================================
+# TAB 3: HYPERPARAMETER TUNING
+# =========================================================
+with tab3:
+    st.header("3. Hyperparameter Tuning")
+
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.write("Tune a Random Forest model using GridSearchCV to improve performance on the training data.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    with st.form("tuning_form"):
+        n_estimators = st.multiselect("n_estimators", [50, 100, 200], default=[50, 100, 200])
+        max_depth_values = st.multiselect("max_depth", [None, 5, 10, 20], default=[None, 5, 10])
+        min_samples_split = st.multiselect("min_samples_split", [2, 5, 10], default=[2, 5])
+        min_samples_leaf = st.multiselect("min_samples_leaf", [1, 2, 4], default=[1, 2])
+        scoring = st.selectbox("Scoring metric", ["recall", "f1", "precision", "accuracy"], index=0)
+
+        submitted = st.form_submit_button("Start Hyperparameter Tuning", use_container_width=True)
+
+    if submitted:
+        pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("model", RandomForestClassifier(random_state=int(random_state)))
+        ])
+
+        param_grid = {
+            "model__n_estimators": n_estimators,
+            "model__max_depth": max_depth_values,
+            "model__min_samples_split": min_samples_split,
+            "model__min_samples_leaf": min_samples_leaf,
+        }
+
+        cv = StratifiedKFold(
+            n_splits=cv_folds,
+            shuffle=True,
+            random_state=int(random_state)
+        )
+
+        grid_search = GridSearchCV(
+            estimator=pipeline,
+            param_grid=param_grid,
+            scoring=scoring,
+            cv=cv,
+            n_jobs=-1,
+            refit=True,
+            verbose=0
+        )
+
+        with st.spinner("Running GridSearchCV..."):
+            grid_search.fit(X_train, y_train)
+
+        best_model = grid_search.best_estimator_
+        best_params = grid_search.best_params_
+
+        st.session_state["best_model"] = best_model
+        st.session_state["best_params"] = best_params
+        st.session_state["fitted_models"]["Tuned Random Forest"] = best_model
+
+        st.success("Tuning complete.")
+        st.subheader("Best Parameters")
+        st.json(best_params)
+
+        cv_results = pd.DataFrame(grid_search.cv_results_).sort_values("rank_test_" + scoring).head(10)
+        display_cols = [
+            "params",
+            "mean_test_" + scoring,
+            "std_test_" + scoring,
+            "rank_test_" + scoring,
+        ]
+        st.subheader("Top Cross-Validation Results")
+        st.dataframe(
+            cv_results[display_cols].rename(
+                columns={
+                    f"mean_test_{scoring}": "mean_score",
+                    f"std_test_{scoring}": "std_score",
+                    f"rank_test_{scoring}": "rank"
+                }
+            ).round(3),
+            use_container_width=True
+        )
+
+# =========================================================
+# TAB 4: MODEL EVALUATION
+# =========================================================
+with tab4:
+    st.header("4. Final Model Evaluation")
+
+    available_models = dict(st.session_state["fitted_models"])
+
+    if st.session_state["best_model"] is not None:
+        available_models["Best Tuned Random Forest"] = st.session_state["best_model"]
+
+    if not available_models:
+        st.info("Train models first in the previous tabs.")
+    else:
+        selected_model_name = st.selectbox(
+            "Choose a trained model",
+            list(available_models.keys()),
+            key="selected_eval_model"
+        )
+        selected_model = available_models[selected_model_name]
+
+        y_pred = selected_model.predict(X_test)
+
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, zero_division=0)
+        recall = recall_score(y_test, y_pred, zero_division=0)
+        f1 = f1_score(y_test, y_pred, zero_division=0)
+
+        st.subheader("Model Performance")
+        metrics_cards(accuracy, precision, recall, f1)
+
+        st.markdown("---")
+
+        st.subheader("Confusion Matrix")
+        cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
+        plot_confusion_matrix(cm)
+
+        st.markdown("---")
+
+        st.subheader("Classification Report")
+        report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+        st.dataframe(pd.DataFrame(report).transpose().round(3), use_container_width=True)
+
+        st.markdown("---")
+
+        if hasattr(selected_model, "predict_proba"):
+            st.subheader("ROC Curve")
+            y_prob = selected_model.predict_proba(X_test)[:, 1]
+            plot_roc_curve(y_test, y_prob)
+
+        st.markdown("---")
+
+        fi = get_feature_importance(selected_model, X.columns)
+        if fi is not None:
+            st.subheader("Feature Importance")
+            st.bar_chart(fi.head(15))
+        else:
+            st.info("This model does not expose feature importance values.")
+
+        st.markdown("---")
+
+        if st.button("Download Trained Model", use_container_width=True):
+            model_bytes = pickle.dumps(selected_model)
+            st.download_button(
+                label="Save model as .pkl",
+                data=model_bytes,
+                file_name=f"{selected_model_name.lower().replace(' ', '_')}.pkl",
+                mime="application/octet-stream",
+            )
+
+# =========================================================
+# TAB 5: PATIENT PREDICTION
+# =========================================================
+with tab5:
+    st.header("5. Patient Prediction")
+
+    available_models = dict(st.session_state["fitted_models"])
+
+    if st.session_state["best_model"] is not None:
+        available_models["Best Tuned Random Forest"] = st.session_state["best_model"]
+
+    if not available_models:
+        st.info("No trained model is available yet. Go to the comparison or tuning tabs first.")
+    else:
+        model_name = st.selectbox(
+            "Choose a model for prediction",
+            list(available_models.keys()),
+            key="prediction_model_select"
+        )
+        model = available_models[model_name]
+
+        st.write("Enter the patient feature values below. Default values are the median values from the training dataset.")
+
+        patient_values = {}
+        form_cols = st.columns(2)
+
+        with st.form("patient_form", clear_on_submit=False):
+            for idx, feature in enumerate(X.columns):
+                default_value = float(X[feature].median())
+                col = form_cols[idx % 2]
+                patient_values[feature] = col.number_input(
+                    feature.replace("_", " ").title(),
+                    value=default_value,
+                    format="%.3f",
+                    step=0.01
+                )
+
+            submit = st.form_submit_button("Predict", use_container_width=True)
+
+        if submit:
+            patient_df = pd.DataFrame([patient_values], columns=X.columns)
+            prediction = int(model.predict(patient_df)[0])
+
+            st.subheader("Prediction Result")
+            if hasattr(model, "predict_proba"):
+                probability = model.predict_proba(patient_df)[0][1]
+                st.metric("Estimated Probability of Class 1", f"{probability:.1%}")
+
+            if prediction == 1:
+                st.warning("The model predicts Class 1 (positive). This is for educational use only and should not be treated as medical advice.")
+            else:
+                st.success("The model predicts Class 0 (negative). This is not a clinical diagnosis and should not replace professional evaluation.")
+
+            st.caption("This educational app is not a clinically validated healthcare tool.")
+
+# =========================================================
+# FOOTER
+# =========================================================
+st.markdown("---")
+st.caption("Project: AI-Based Heart Disease Prediction using Machine Learning and Hyperparameter Tuning")
+st.caption("For academic and educational purposes only.")
